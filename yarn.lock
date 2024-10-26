@@ -5740,7 +5740,6 @@ fast-api@^0.4.0:
     express "^4.3.1"
     express-enforces-ssl "^1.1.0"
     express-session "^1.2.0"
-    gzippo "^0.2.0"
     helmet "^0.5.2"
     lodash "^2.4.1"
     method-override "^2.x"
@@ -6282,13 +6281,6 @@ gzip-size@^6.0.0:
   integrity sha512-ax7ZYomf6jqPTQ4+XCpUGyXKHk5WweS+e05MBO4/y3WJ5RkmPXNKvX+bx1behVILVwr6JSQvZAku021CHPXG3Q==
   dependencies:
     duplexer "^0.1.2"
-
-gzippo@^0.2.0:
-  version "0.2.0"
-  resolved "https://registry.npmjs.org/gzippo/-/gzippo-0.2.0.tgz"
-  integrity sha512-hnspQntLaxRudYO72t3QB+J8LY1ah7t4ULPfb7LDJWdmJqa4EpMiBjiQCCGGVYYEf32Qk0cRIvrQa1p075DMCQ==
-  dependencies:
-    send "*"
 
 handle-thing@^2.0.0:
   version "2.0.1"
