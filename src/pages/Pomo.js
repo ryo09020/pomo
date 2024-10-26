@@ -10,6 +10,9 @@ import {
   serverTimestamp
 } from "firebase/firestore";
 import Camera from "../components/Camera";
+import { startNeckStretch } from "../components/StretchNeck";
+import { set } from "firebase/database";
+
 
 function Pomo() {
   const { currentUser } = useAuth();
@@ -25,6 +28,7 @@ function Pomo() {
   const [loading, setLoading] = useState(false);
   const [showNewCategoryInput, setShowNewCategoryInput] = useState(false);
   const [waitingForSmile, setWaitingForSmile] = useState(false);
+  const [sessionCount, setSessionCount] = useState(0);
 
   // カテゴリーの取得
   const fetchCategories = useCallback(async () => {
@@ -63,6 +67,9 @@ function Pomo() {
         await addDoc(pomodoroRef, pomodoroData);
         console.log("Work session completed and saved");
 
+        const newSessionCount = sessionCount + 1;
+        setSessionCount(newSessionCount);
+
         if (Notification.permission === 'granted') {
           new Notification('作業完了！', {
             body: '笑顔で休憩を開始しましょう！'
@@ -70,7 +77,9 @@ function Pomo() {
         }
 
         setIsActive(false);
+        startNeckStretch(); // 首のストレッチを開始(変更点)
         setWaitingForSmile(true);
+        
       } else {
         if (Notification.permission === 'granted') {
           new Notification('休憩終了！', {
@@ -137,15 +146,23 @@ function Pomo() {
     setMinutes(0);
     setSeconds(30);
     setWaitingForSmile(false);
+    setSessionCount(0);
     console.log("Timer reset");
   }, []);
 
   // 笑顔検出時の処理
   const handleSmileDetected = useCallback(() => {
     if (waitingForSmile) {
+      //休憩開始時
+      if (sessionCount == 4) {
+        setMinutes(0);
+        setSeconds(30);
+        setSessionCount(0);
+      } else {
+        setMinutes(0);
+        setSeconds(15);
+      }
       setMode('break');
-      setMinutes(0);
-      setSeconds(15);
       setIsActive(true);
       setWaitingForSmile(false);
       console.log("Break started due to smile detection");
@@ -153,7 +170,7 @@ function Pomo() {
       console.log("Starting timer due to smile detection");
       startTimer();
     }
-  }, [isActive, taskName, selectedCategory, startTimer, waitingForSmile]);
+  }, [isActive, taskName, selectedCategory, startTimer, waitingForSmile, sessionCount]);
 
   // カテゴリーの初期読み込み
   useEffect(() => {
@@ -188,9 +205,14 @@ function Pomo() {
         <div className="space-y-8">
           {/* タイマー表示 */}
           <div className="bg-white rounded-lg shadow-lg p-8 text-center">
+            <div className="mb-2">
+              <p className="text-sm text-gray-600">
+                セッション: {sessionCount + 1} / 4
+              </p>
+            </div>
             <div className="mb-6">
               <h2 className="text-2xl font-bold text-gray-900">
-                {waitingForSmile ? '笑顔で休憩開始' : mode === 'work' ? '作業時間' : '休憩時間'}
+                {waitingForSmile ? '笑顔で休憩開始' : mode === 'work' ? '作業時間' : sessionCount === 4 ? '長い休憩時間' : '休憩時間'}
               </h2>
               {taskName && (
                 <div className="mt-2 space-y-1">
