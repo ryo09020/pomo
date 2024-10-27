@@ -3,19 +3,24 @@ import Webcam from "react-webcam";
 import * as faceapi from 'face-api.js';
 import { Holistic } from '@mediapipe/holistic';
 
-
-function Camera({ mode, waitForWorking, stdUrl, setStdUrl, setPoseScore, onSmileDetected }) {
+function Camera({ mode, setMode, waitForWorking, stdUrl, setStdUrl, setPoseScore, onSmileDetected }) {
   const [isEnabled, setIsEnabled] = useState(false);
   const [isModelLoaded, setIsModelLoaded] = useState(false);
   const [isSmiling, setIsSmiling] = useState(false);
-  const [count, setCount] = useState(0);
   const [stdFeatures, setStdFeatures] = useState(null);
   const webcamRef = useRef(null);
   const canvasRef = useRef(null);
   const holisticRef = useRef(null);
-  const SHOULDER_THRESHOLD = 0.05
-  const FACEAREA_THRESHOLD = 1.1
-  const DISTORTION_THRESHOLD = 0.05
+  const poseScoreRef = useRef({
+    good: 0,
+    catSpine: 0,
+    shallowSitting: 0,
+    distorting: 0
+  });
+
+  const SHOULDER_THRESHOLD = 0.02;
+  const FACEAREA_THRESHOLD = 1.05;
+  const DISTORTION_THRESHOLD = 0.05;
 
   // Helper functions
   const distance = (x1, y1, x2, y2) => {
@@ -49,6 +54,61 @@ function Camera({ mode, waitForWorking, stdUrl, setStdUrl, setPoseScore, onSmile
     };
   }, [stdFeatures]);
 
+  // Face detection model loading
+  useEffect(() => {
+    const loadModels = async () => {
+      try {
+        await Promise.all([
+          faceapi.nets.tinyFaceDetector.loadFromUri('/models'),
+          faceapi.nets.faceExpressionNet.loadFromUri('/models')
+        ]);
+        console.log("Face detection models loaded successfully");
+        setIsModelLoaded(true);
+      } catch (error) {
+        console.error("Error loading models:", error);
+      }
+    };
+    loadModels();
+  }, []);
+
+  // Smile detection
+  const detectExpressions = useCallback(async () => {
+    if (webcamRef.current && webcamRef.current.video && webcamRef.current.video.readyState === 4) {
+      const video = webcamRef.current.video;
+      try {
+        const detections = await faceapi
+          .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions())
+          .withFaceExpressions();
+
+        if (detections) {
+          const smile = detections.expressions.happy;
+          const wasSmiling = isSmiling;
+
+          if (smile > 0.7) {
+            if (waitForWorking && !stdUrl) {
+              const imgSrc = webcamRef.current?.getScreenshot();
+              setStdUrl(imgSrc);
+            }
+            if  (mode == 'waitForWorking') {
+              setMode('work');
+            }
+            setIsSmiling(true);
+
+            if (!wasSmiling && onSmileDetected) {
+              console.log("Smile detected, confidence:", smile);
+              onSmileDetected();
+            }
+          } else {
+            setIsSmiling(false);
+          }
+        }
+      } catch (error) {
+        console.error("Error during expression detection:", error);
+      }
+    }
+  }, [isSmiling, onSmileDetected, waitForWorking, stdUrl, setStdUrl]);
+
+  // Posture analysis functions
   const isBiggerFace = useCallback((curr) => {
     if (!stdFeatures || !curr) return false;
     return curr.face_area / stdFeatures.face_area > FACEAREA_THRESHOLD;
@@ -66,7 +126,7 @@ function Camera({ mode, waitForWorking, stdUrl, setStdUrl, setPoseScore, onSmile
     return stdShouldersHeight - currentShouldersHeight > SHOULDER_THRESHOLD;
   }, [stdFeatures]);
 
-  const isCatSpain = useCallback((curr) => {
+  const isCatSpine = useCallback((curr) => {
     return isBiggerFace(curr) && isLowerShoulders(curr);
   }, [isBiggerFace, isLowerShoulders]);
 
@@ -97,27 +157,18 @@ function Camera({ mode, waitForWorking, stdUrl, setStdUrl, setPoseScore, onSmile
         setStdFeatures(getImportantFeatures(results));
       } else {
         const currentFeatures = getImportantFeatures(results);
-        
-        if (isCatSpain(currentFeatures)) {
-          setPoseScore((prev) => ({
-            ...prev,
-            catSpain: prev.catSpain + 1
-          }));
-        } else if (isShallowSitting(currentFeatures)) {
-          setPoseScore((prev) => ({
-            ...prev,
-            shallowSitting: prev.shallowSitting + 1
-          }));
-        } else if (isDistorting(currentFeatures)) {
-          setPoseScore((prev) => ({
-            ...prev,
-            distorting: prev.distorting + 1
-          }));
-        } else {
-          setPoseScore((prev) => ({
-            ...prev,
-            good: prev.good + 1
-          }));
+        if (mode === 'work') {
+          if (isCatSpine(currentFeatures)) {
+            poseScoreRef.current.catSpine += 1;
+          } else if (isShallowSitting(currentFeatures)) {
+            poseScoreRef.current.shallowSitting += 1;
+          } else if (isDistorting(currentFeatures)) {
+            poseScoreRef.current.distorting += 1;
+          } else {
+            poseScoreRef.current.good += 1;
+          }
+          // UIの更新用にsetPoseScoreも呼び出す
+          setPoseScore({...poseScoreRef.current});
         }
       }
     });
@@ -127,63 +178,29 @@ function Camera({ mode, waitForWorking, stdUrl, setStdUrl, setPoseScore, onSmile
         holisticRef.current.close();
       }
     };
-  }, [stdFeatures, getImportantFeatures, isCatSpain, isShallowSitting, isDistorting, setPoseScore]);
+  }, [stdFeatures, getImportantFeatures, isCatSpine, isShallowSitting, isDistorting, setPoseScore]);
 
-
-  // モデルの読み込み
+  // コンポーネントがアンマウントされる前に最終的なスコアを親に通知
   useEffect(() => {
-    const loadModels = async () => {
-      try {
-        await Promise.all([
-          faceapi.nets.tinyFaceDetector.loadFromUri('/models'),
-          faceapi.nets.faceExpressionNet.loadFromUri('/models')
-        ]);
-        console.log("Face detection models loaded successfully");
-        setIsModelLoaded(true);
-      } catch (error) {
-        console.error("Error loading models:", error);
-      }
+    return () => {
+      setPoseScore({...poseScoreRef.current});
     };
-    loadModels();
-  }, []);
+  }, [setPoseScore]);
 
-
-  // 表情認識の処理
-  const detectExpressions = useCallback(async () => {
-    if (webcamRef.current && webcamRef.current.video && webcamRef.current.video.readyState === 4) {
-      const video = webcamRef.current.video;
-      try {
-        const detections = await faceapi
-          .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions())
-          .withFaceExpressions();
-
-        if (detections) {
-          const smile = detections.expressions.happy;
-          const wasSmiling = isSmiling;  // 前の状態を保存
-          // 基準の設定
-          if (smile > 0.7) {
-            if (waitForWorking && !stdUrl) {
-              const imgSrc = webcamRef.current?.getScreenshot();
-              setStdUrl(imgSrc);
-            }
-            setIsSmiling(true)
-          }
-
-          // 笑顔を検出し、かつ前回は笑顔でなかった場合のみonSmileDetectedを呼び出す
-          if (smile > 0.7 && !wasSmiling && onSmileDetected) {
-            setCount(count + 1);
-            console.log("Smile detected, confidence:", smile);
-            onSmileDetected();
-          }
-
-        }
-      } catch (error) {
-        console.error("Error during expression detection:", error);
-      }
+  // モードが変更されたときにスコアをリセット
+  useEffect(() => {
+    if (mode === 'work') {
+      poseScoreRef.current = {
+        good: 0,
+        catSpine: 0,
+        shallowSitting: 0,
+        distorting: 0
+      };
+      setPoseScore(poseScoreRef.current);
     }
-  }, [isSmiling, onSmileDetected]);
+  }, [mode]);
 
-  // 表情認識の定期実行
+  // Face detection interval
   useEffect(() => {
     let detectInterval;
 
@@ -221,6 +238,7 @@ function Camera({ mode, waitForWorking, stdUrl, setStdUrl, setPoseScore, onSmile
     }
   }, []);
 
+  // Posture detection interval
   useEffect(() => {
     let interval;
     if (mode === 'work' && isEnabled) {
@@ -231,13 +249,6 @@ function Camera({ mode, waitForWorking, stdUrl, setStdUrl, setPoseScore, onSmile
     };
   }, [mode, isEnabled, capturePosture]);
 
-  // 基準設定用
-  useEffect(() => {
-    if (holisticRef.current){
-      holisticRef.current.send({image: stdUrl});
-    }
-  }, [stdUrl]);
-
   const videoConstraints = {
     width: 640,
     height: 480,
@@ -246,14 +257,7 @@ function Camera({ mode, waitForWorking, stdUrl, setStdUrl, setPoseScore, onSmile
 
   const handleCameraToggle = useCallback(() => {
     setIsEnabled(prev => !prev);
-    if (!isEnabled) {
-      console.log("Camera enabled");
-    } else {
-      console.log("Camera disabled");
-    }
-  }, [isEnabled]);
-
-  
+  }, []);
 
   return (
     <div className="relative">
@@ -270,7 +274,7 @@ function Camera({ mode, waitForWorking, stdUrl, setStdUrl, setPoseScore, onSmile
         </button>
         {isEnabled && isSmiling && (
           <div className="text-green-500 font-medium animate-pulse">
-            😊 笑顔を検出しました！{count}
+            😊 笑顔を検出しました！
           </div>
         )}
       </div>

@@ -11,6 +11,10 @@
  * @property {string} taskName - タスク名
  * @property {number} duration - 作業時間（分）
  * @property {('work'|'break')} mode - 作業モード
+ * @property {number} good
+ * @property {number} catSpain
+ * @property {number} shallowSitting
+ * @property {number} distorting
  */
 
 /**

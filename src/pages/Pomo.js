@@ -9,11 +9,10 @@ import {
   orderBy,
   serverTimestamp
 } from "firebase/firestore";
-import Camera from "../components/Camera";
+import Camera from "../components/NewCamera";
 import { startNeckStretch } from "../components/StretchNeck";
 //import { set } from "firebase/database";
 //import { startWaistStretch } from "../components/StretchWaist";
-
 
 function Pomo() {
   const { currentUser } = useAuth();
@@ -29,6 +28,14 @@ function Pomo() {
   const [loading, setLoading] = useState(false);
   const [showNewCategoryInput, setShowNewCategoryInput] = useState(false);
   const [waitingForSmile, setWaitingForSmile] = useState(false);
+  const [poseScore, setPoseScore] = useState({
+    good: 0,
+    catSpine: 0,
+    shallowSitting: 0,
+    distorting: 0
+  });
+  const [stdImageUrl, setStdImageUrl] = useState(null);
+  const [waitForWorking, setWaitingForWorking] = useState(true);
   const [sessionCount, setSessionCount] = useState(1);
 
   // カテゴリーの取得
@@ -49,6 +56,8 @@ function Pomo() {
   }, [currentUser.uid]);
 
   // Pomodoro完了時の処理
+  // poseScoreを使ってfirebaseに記録
+  // poseScoreを使って結果を表示
   const handlePomodoroComplete = useCallback(async () => {
     try {
       setLoading(true);
@@ -62,7 +71,8 @@ function Pomo() {
           taskName: taskName,
           duration: 0.5,
           mode: mode,
-          completed: true
+          completed: true,
+          poseScore: poseScore,
         };
         
         await addDoc(pomodoroRef, pomodoroData);
@@ -78,6 +88,8 @@ function Pomo() {
         await startNeckStretch(); // 首のストレッチを開始(変更点)
 
         setIsActive(false);
+        setMode('wait');
+        setStdImageUrl(null);
         setWaitingForSmile(true);
         
       } else {
@@ -88,9 +100,16 @@ function Pomo() {
             body: '次のタスクを開始しましょう。'
           });
         }
-        setMode('work');
+        setWaitingForWorking(true);
+        setPoseScore({
+          good: 0,
+          catSpine: 0,
+          shallowSitting: 0,
+          distorting: 0
+        });
         setMinutes(0);
-        setSeconds(25);
+        setSeconds(30);
+        setMode('waitForWorking');
         setIsActive(false);
       }
     } catch (error) {
@@ -138,13 +157,20 @@ function Pomo() {
     }
     console.log("Starting timer with task:", taskName, "category:", selectedCategory);
     setIsActive(true);
+    setWaitingForWorking(false);
   }, [taskName, selectedCategory]);
 
   // タイマーのリセット
   const resetTimer = useCallback(() => {
     setIsActive(false);
     setShowTaskModal(true);
-    setMode('work');
+    setMode('waitForWorking');
+    setPoseScore({
+      good: 0,
+      catSpine: 0,
+      distorting: 0,
+      shallowSitting: 0
+    });
     setMinutes(0);
     setSeconds(25);
     setWaitingForSmile(false);
@@ -180,6 +206,7 @@ function Pomo() {
   }, [fetchCategories]);
 
   // タイマーの制御
+  // PoseDetect処理
   useEffect(() => {
     let interval;
     if (isActive) {
@@ -214,7 +241,7 @@ function Pomo() {
             </div>
             <div className="mb-6">
               <h2 className="text-2xl font-bold text-gray-900">
-                {waitingForSmile ? '笑顔で休憩開始' : mode === 'work' ? '作業時間' : sessionCount === 4 ? '長い休憩時間' : '休憩時間'}
+                {waitingForSmile ? '笑顔で休憩開始' : (mode === 'work' || mode === 'waitForWorking') ? '作業時間' : sessionCount === 4 ? '長い休憩時間' : '休憩時間'}
               </h2>
               {taskName && (
                 <div className="mt-2 space-y-1">
@@ -287,8 +314,27 @@ function Pomo() {
           <h2 className="text-lg font-medium text-gray-900 mb-4">
             笑顔検出
           </h2>
-          <Camera onSmileDetected={handleSmileDetected} />
+          <Camera mode={mode} setMode={setMode} waitForWorking={waitForWorking} stdUrl={stdImageUrl} setStdUrl={setStdImageUrl} setPoseScore={setPoseScore} onSmileDetected={handleSmileDetected} />
         </div>
+        {waitForWorking && (
+          <h2>
+            今はワーク待ちだよ
+          </h2>
+        )}
+        {stdImageUrl && (
+          <h2>
+            基準を獲得できました！
+          </h2>
+        )}
+        {poseScore && (
+          <ul>
+          {Object.entries(poseScore).map(([key, value]) => (
+            <li key={key}>
+              {key}: {value}
+            </li>
+          ))}
+        </ul>
+        )}
       </div>
 
       {/* タスク設定モーダル */}
