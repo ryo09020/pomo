@@ -3,7 +3,7 @@
 [![IMAGE ALT TEXT HERE](https://jphacks.com/wp-content/uploads/2024/07/JPHACKS2024_ogp.jpg)](https://www.youtube.com/watch?v=DZXUkEj-CSI)
 
 ## 製品概要
-- ポモドーロタイマー+作業姿勢とストレッチの検知
+- ポモドーロタイマー+作業姿勢とストレッチ笑顔の検知
 ポモドーロテクニックを使い、作業効率を上げながら健康をサポートする革新的なタイマー。研究者や学生などのデスクワーカーのウェルビーイングを目的とする。
 
 ### 背景(製品開発のきっかけ、課題等）
