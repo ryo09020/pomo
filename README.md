@@ -51,7 +51,7 @@
 - firebase
 
 #### デバイス
--pc　webカメラ
+-　pc　webカメラ
 
 ### 独自技術
 
