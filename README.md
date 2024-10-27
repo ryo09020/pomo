@@ -1,6 +1,6 @@
 # KINOKEN
 
-[![IMAGE ALT TEXT HERE](https://jphacks.com/wp-content/uploads/2024/07/JPHACKS2024_ogp.jpg)](https://www.youtube.com/watch?v=DZXUkEj-CSI)
+[![IMAGE ALT TEXT HERE](https://jphacks.com/wp-content/uploads/2024/07/JPHACKS2024_ogp.jpg)](https://youtu.be/D2Tx3cTJGKk)
 
 ## 製品概要
 - ポモドーロタイマー+作業姿勢とストレッチ笑顔の検知
