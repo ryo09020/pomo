@@ -198,7 +198,7 @@ function Camera({ mode, setMode, waitForWorking, stdUrl, setStdUrl, setPoseScore
       };
       setPoseScore(poseScoreRef.current);
     }
-  }, [mode, setPoseScore]);
+  }, [mode]);
 
   // Face detection interval
   useEffect(() => {
