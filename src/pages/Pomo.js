@@ -18,7 +18,7 @@ import { startNeckStretch } from "../components/StretchNeck";
 function Pomo() {
   const { currentUser } = useAuth();
   const [minutes, setMinutes] = useState(0);
-  const [seconds, setSeconds] = useState(3);
+  const [seconds, setSeconds] = useState(25);
   const [isActive, setIsActive] = useState(false);
   const [mode, setMode] = useState('work');
   const [categories, setCategories] = useState([]);
@@ -90,7 +90,7 @@ function Pomo() {
         }
         setMode('work');
         setMinutes(0);
-        setSeconds(3);
+        setSeconds(25);
         setIsActive(false);
       }
     } catch (error) {
@@ -146,7 +146,7 @@ function Pomo() {
     setShowTaskModal(true);
     setMode('work');
     setMinutes(0);
-    setSeconds(3);
+    setSeconds(25);
     setWaitingForSmile(false);
     setSessionCount(1);
     console.log("Timer reset");
@@ -158,11 +158,11 @@ function Pomo() {
       //休憩開始時
       if (sessionCount == 4) {
         setMinutes(0);
-        setSeconds(2);
+        setSeconds(30);
         setSessionCount(0);
       } else {
         setMinutes(0);
-        setSeconds(1);
+        setSeconds(15);
       }
       setMode('break');
       setIsActive(true);
