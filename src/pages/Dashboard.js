@@ -16,6 +16,7 @@ import {
   Line,
   Legend
 } from 'recharts';
+import PostureStatistics from "../components/PostureStatistics";
 
 const COLORS = ['#EF4444', '#F59E0B', '#10B981', '#3B82F6', '#6366F1', '#8B5CF6', '#EC4899'];
 
@@ -282,6 +283,12 @@ function Dashboard() {
             </table>
           </div>
         </div>
+          
+        {/* 姿勢分析 */}
+        <div className="mt-8">
+          <PostureStatistics sessions = {recentPomodoros} />
+        </div>
+
       </div>
     </div>
   );
