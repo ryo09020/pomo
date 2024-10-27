@@ -11,13 +11,14 @@ import {
 } from "firebase/firestore";
 import Camera from "../components/Camera";
 import { startNeckStretch } from "../components/StretchNeck";
-import { set } from "firebase/database";
+//import { set } from "firebase/database";
+//import { startWaistStretch } from "../components/StretchWaist";
 
 
 function Pomo() {
   const { currentUser } = useAuth();
   const [minutes, setMinutes] = useState(0);
-  const [seconds, setSeconds] = useState(30);
+  const [seconds, setSeconds] = useState(3);
   const [isActive, setIsActive] = useState(false);
   const [mode, setMode] = useState('work');
   const [categories, setCategories] = useState([]);
@@ -28,7 +29,7 @@ function Pomo() {
   const [loading, setLoading] = useState(false);
   const [showNewCategoryInput, setShowNewCategoryInput] = useState(false);
   const [waitingForSmile, setWaitingForSmile] = useState(false);
-  const [sessionCount, setSessionCount] = useState(0);
+  const [sessionCount, setSessionCount] = useState(1);
 
   // カテゴリーの取得
   const fetchCategories = useCallback(async () => {
@@ -67,28 +68,29 @@ function Pomo() {
         await addDoc(pomodoroRef, pomodoroData);
         console.log("Work session completed and saved");
 
-        const newSessionCount = sessionCount + 1;
-        setSessionCount(newSessionCount);
 
         if (Notification.permission === 'granted') {
           new Notification('作業完了！', {
             body: '笑顔で休憩を開始しましょう！'
           });
         }
+        //await startWaistStretch(); // 腰のストレッチを開始（追加）
+        await startNeckStretch(); // 首のストレッチを開始(変更点)
 
         setIsActive(false);
-        startNeckStretch(); // 首のストレッチを開始(変更点)
         setWaitingForSmile(true);
         
       } else {
         if (Notification.permission === 'granted') {
+          const newSessionCount = sessionCount + 1;
+          setSessionCount(newSessionCount);
           new Notification('休憩終了！', {
             body: '次のタスクを開始しましょう。'
           });
         }
         setMode('work');
         setMinutes(0);
-        setSeconds(30);
+        setSeconds(3);
         setIsActive(false);
       }
     } catch (error) {
@@ -144,9 +146,9 @@ function Pomo() {
     setShowTaskModal(true);
     setMode('work');
     setMinutes(0);
-    setSeconds(30);
+    setSeconds(3);
     setWaitingForSmile(false);
-    setSessionCount(0);
+    setSessionCount(1);
     console.log("Timer reset");
   }, []);
 
@@ -156,11 +158,11 @@ function Pomo() {
       //休憩開始時
       if (sessionCount == 4) {
         setMinutes(0);
-        setSeconds(30);
+        setSeconds(2);
         setSessionCount(0);
       } else {
         setMinutes(0);
-        setSeconds(15);
+        setSeconds(1);
       }
       setMode('break');
       setIsActive(true);
@@ -207,7 +209,7 @@ function Pomo() {
           <div className="bg-white rounded-lg shadow-lg p-8 text-center">
             <div className="mb-2">
               <p className="text-sm text-gray-600">
-                セッション: {sessionCount + 1} / 4
+                セッション: {sessionCount == 0 ? 4 : sessionCount} / 4
               </p>
             </div>
             <div className="mb-6">

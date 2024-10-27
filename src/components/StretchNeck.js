@@ -1,5 +1,3 @@
-// src/components/stretchNeck.js
-
 import React, { useEffect, useRef, useState } from 'react';
 import ReactDOM from 'react-dom';
 import { FaceMesh } from '@mediapipe/face_mesh';
@@ -32,7 +30,7 @@ function calculateHeadYaw(landmarks, imageWidth, imageHeight) {
 
 // ストレッチシーケンス管理クラス
 class StretchSequence {
-  constructor(requiredDuration = 2000, maxLoops = 3) { // ミリ秒単位、最大ループ数
+  constructor(requiredDuration = 2000, maxLoops = 1) { // ミリ秒単位、最大ループ数
     this.sequence = ['center', 'left', 'center', 'right'];
     this.currentStep = 0;
     this.requiredDuration = requiredDuration;
@@ -148,7 +146,7 @@ function NeckStretchModal({ onComplete }) {
   const [nextPosition, setNextPosition] = useState('');
   const [completed, setCompleted] = useState(false);
   const [countdown, setCountdown] = useState(0); // カウントダウンタイマー
-  const [remainingLoops, setRemainingLoops] = useState(3);
+  const [remainingLoops, setRemainingLoops] = useState(1);
   const [sequence, setSequence] = useState(['center', 'left', 'center', 'right']);
   const [isWaiting, setIsWaiting] = useState(false); // 2秒間待機中かどうか
 
@@ -159,7 +157,7 @@ function NeckStretchModal({ onComplete }) {
     let countdownInterval;
 
     // StretchSequenceのインスタンスを作成し、refに保存
-    stretchSeqRef.current = new StretchSequence(2000, 3); // 2秒間、3ループ
+    stretchSeqRef.current = new StretchSequence(2000, 1); // 2秒間、3ループ
     setNextPosition(stretchSeqRef.current.getNextPosition());
     setRemainingLoops(stretchSeqRef.current.getRemainingLoops());
 
@@ -246,7 +244,7 @@ function NeckStretchModal({ onComplete }) {
         displayGuideline(
           ctx,
           stretchSeqRef.current.getNextPosition(),
-          [width / 2, height / 2-20],
+          [width / 2, height / 2 - 20],
           { width: width * 0.2, height: height * 0.3 }, // 相対的なサイズ
           width * 0.25, // シフト距離をキャンバス幅の約 46.875% に設定
           width
@@ -271,27 +269,6 @@ function NeckStretchModal({ onComplete }) {
 
       // シーケンスの表示を描画（反転なし）
       displaySequence(ctx, stretchSeqRef.current, width);
-
-      /*// テキスト描画（反転を解除）
-      if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
-        const landmarks = results.multiFaceLandmarks[0];
-        const yaw = calculateHeadYaw(landmarks, width, height);
-        let position = 'center';
-        if (yaw > 25) {
-          position = 'left';
-        } else if (yaw < -25) {
-          position = 'right';
-        }
-
-        // テキストを通常の状態で描画
-        ctx.font = '20px Arial';
-        ctx.fillStyle = '#4CAF50';
-        ctx.textAlign = 'left';
-        ctx.fillText(`Yaw: ${yaw.toFixed(2)}°`, 30, 30);
-
-        ctx.fillStyle = '#2196F3';
-        ctx.fillText(`Position: ${position}`, 30, 60);
-      }*/
 
       animationFrameId = requestAnimationFrame(() => {
         faceMesh.send({ image: videoRef.current });
@@ -376,6 +353,7 @@ function NeckStretchModal({ onComplete }) {
       <div className="bg-white rounded-lg shadow-lg p-4 w-full max-w-md relative">
         <div className="flex justify-between items-center mb-2">
           <h2 className="text-2xl font-bold text-gray-800">首のストレッチ</h2>
+          {/* 閉じるボタン 削除
           <button
             onClick={() => {
               ReactDOM.unmountComponentAtNode(document.getElementById('neck-stretch-root'));
@@ -383,6 +361,7 @@ function NeckStretchModal({ onComplete }) {
               if (existing) {
                 existing.remove();
               }
+              onComplete(); // モーダルを閉じた際にも Promise を解決
             }}
             className="text-gray-500 hover:text-gray-700 focus:outline-none"
           >
@@ -390,6 +369,7 @@ function NeckStretchModal({ onComplete }) {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
+          */}
         </div>
         <div className="flex flex-col items-center">
           <video ref={videoRef} className="hidden"></video>
@@ -440,22 +420,26 @@ function NeckStretchModal({ onComplete }) {
 
 // ストレッチ開始関数
 export function startNeckStretch() {
-  const onComplete = () => {
-    ReactDOM.unmountComponentAtNode(document.getElementById('neck-stretch-root'));
-    const existing = document.getElementById('neck-stretch-root');
-    if (existing) {
-      existing.remove();
-    }
-  };
+  return new Promise((resolve, reject) => {
+    const onComplete = () => {
+      ReactDOM.unmountComponentAtNode(document.getElementById('neck-stretch-root'));
+      const existing = document.getElementById('neck-stretch-root');
+      if (existing) {
+        existing.remove();
+      }
+      resolve(); // Promise を解決
+    };
 
-  const neckStretchRoot = document.createElement('div');
-  neckStretchRoot.id = 'neck-stretch-root';
-  document.body.appendChild(neckStretchRoot);
+    const neckStretchRoot = document.createElement('div');
+    neckStretchRoot.id = 'neck-stretch-root';
+    document.body.appendChild(neckStretchRoot);
 
-  ReactDOM.render(<NeckStretchModal onComplete={onComplete} />, neckStretchRoot);
+    ReactDOM.render(<NeckStretchModal onComplete={onComplete} />, neckStretchRoot);
+  });
 }
 
 export default NeckStretchModal;
+
 
 
 
