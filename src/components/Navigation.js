@@ -22,7 +22,7 @@ function Navigation() {
           <div className="flex">
             <div className="flex-shrink-0 flex items-center">
               <Link to="/" className="text-2xl text-red-600 font-bold">
-                🍅 Pomodoro
+                🐈 KINOKEN
               </Link>
             </div>
             <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
