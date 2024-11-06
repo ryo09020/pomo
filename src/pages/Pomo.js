@@ -38,6 +38,11 @@ function Pomo() {
   const [waitForWorking, setWaitingForWorking] = useState(true);
   const [sessionCount, setSessionCount] = useState(1);
 
+  const [report, setReport] = useState('');
+  const [transcript, setTranscript] = useState('');
+  const [recognition, setRecognition] = useState(null);
+  const [isRecording, setIsRecording] = useState(false);
+
   // カテゴリーの取得
   const fetchCategories = useCallback(async () => {
     try {
@@ -226,6 +231,124 @@ function Pomo() {
     }
     return () => clearInterval(interval);
   }, [isActive, minutes, seconds, handlePomodoroComplete]);
+
+
+  const handleFinishTasks = () => {
+    if (window.confirm('本当に本日のタスクを終了しますか？')) {
+      startRecording();
+    }
+  };
+
+  
+  const startRecording = () => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert('このブラウザは音声認識に対応していません。');
+      return;
+    }
+  
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'ja-JP';
+  
+    recognition.start();
+  
+    recognition.onresult = (event) => {
+      const transcript = event.results[0][0].transcript;
+       // 音声入力をそのまま表示
+      setReport(transcript);
+      // getSummary(transcript);
+    };
+  
+    recognition.onerror = (event) => {
+      console.error('音声認識エラー:', event.error);
+      alert('音声認識中にエラーが発生しました。');
+    };
+  };
+
+// ここから追加
+
+  const handleStartRecording = () => {
+    
+      const SpeechRecognition =
+        window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechRecognition) {
+        alert('このブラウザは音声認識に対応していません。');
+        return;
+      }
+
+      const recognitionInstance = new SpeechRecognition();
+      recognitionInstance.lang = 'ja-JP';
+      recognitionInstance.continuous = true;
+      recognitionInstance.interimResults = true;
+
+      let finalTranscript = '';
+
+      recognitionInstance.onresult = (event) => {
+        let interimTranscript = '';
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const result = event.results[i];
+          if (result.isFinal) {
+            finalTranscript += result[0].transcript;
+          } else {
+            interimTranscript += result[0].transcript;
+          }
+        }
+        // リアルタイムの文字起こしを表示（最終結果＋一時結果）
+        setTranscript(finalTranscript + interimTranscript);
+      };
+
+      recognitionInstance.onerror = (event) => {
+        console.error('音声認識エラー:', event.error);
+        alert('音声認識中にエラーが発生しました。');
+        setIsRecording(false);
+      };
+
+      recognitionInstance.onend = () => {
+        setIsRecording(false);
+        // sendToOpenAI(finalTranscript);
+      };
+
+      recognitionInstance.start();
+      setRecognition(recognitionInstance);
+      setIsRecording(true);
+      setTranscript('');
+    
+  };
+  
+  const handleStopRecording = () => {
+    if (recognition) {
+      recognition.stop();
+      setIsRecording(false);
+      setReport(transcript); // 音声入力結果をレポートに保存
+    }
+  };
+
+  const sendToOpenAI = async (text) => {
+    try {
+      const apiKey = process.env.REACT_APP_OPENAI_API_KEY;
+
+      const response = await fetch('https://api.openai.com/v1/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model: 'text-davinci-003',
+          prompt: `以下の内容を元に、今日の達成事項と難しかったことをシンプルにまとめてください。\n\n${text}`,
+          max_tokens: 150,
+          temperature: 0.7,
+        }),
+      });
+
+      const data = await response.json();
+      const aiReply = data.choices[0].text.trim();
+      setReport(aiReply);
+    } catch (error) {
+      console.error('OpenAI APIエラー:', error);
+      alert('レポートの生成中にエラーが発生しました。');
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-red-50 via-white to-red-50 flex flex-col">
@@ -423,17 +546,83 @@ function Pomo() {
                     if (taskName && selectedCategory) {
                       setShowTaskModal(false);
                     }
-                  }}
-                  disabled={!taskName || !selectedCategory}
-                  className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50 transition-colors duration-200"
-                >
-                  設定
-                </button>
+                    }}
+                    disabled={!taskName || !selectedCategory}
+                    className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50 transition-colors duration-200"
+                  >
+                    設定
+                  </button>
+                  </div>
+                </div>
+                </div>
+                
               </div>
-            </div>
-          </div>
-        </div>
-      )}
+              )}
+
+              {isRecording && (
+              <div
+                style={{
+                position: 'fixed',
+                bottom: '100px',
+                right: '20px',
+                padding: '20px',
+                backgroundColor: 'white',
+                border: '2px solid red',
+                borderRadius: '8px',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+                width: '350px',
+                zIndex: 1000,
+                }}
+              >
+                <h3 className="text-lg font-bold text-red-600 mb-2">音声入力中...</h3>
+                <p className="text-gray-700 mb-4">今日のタスクの進捗や難しかったこと、学んだことを教えてください！！</p>
+                <p className="text-gray-900 mb-4">{transcript}</p>
+                <button onClick={handleStopRecording} className="w-full bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 transition-colors duration-200">録音停止</button>
+              </div>
+              )}
+
+              {report && (
+              <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                <div className="bg-white p-6 rounded-lg shadow-xl max-w-md w-full relative">
+                <h2 className="text-xl font-bold text-gray-900 mb-4">本日のレポート</h2>
+                <p className="text-gray-700">{report}</p>
+                <div className="flex justify-end space-x-3">
+                  <button
+                    onClick={() => setReport('')}
+                    className="mt-4 w-full bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 transition-colors duration-200"
+                  >
+                    閉じる
+                  </button>
+                  <button
+                    onClick={() => {
+                      setReport('');
+                      handleStartRecording();
+                    }}
+                    className="mt-4 w-full bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 transition-colors duration-200"
+                  >
+                    やり直す
+                  </button>
+                </div>
+                </div>
+              </div>
+              )}
+
+              {/* 「今日のタスク終了」ボタン */}
+      <button
+        onClick={() => {
+          if (window.confirm('本当に本日のタスクを終了しますか？')) {
+            handleStartRecording();
+          }
+        }}
+        style={{
+          position: 'fixed',
+          bottom: '20px',
+          right: '20px',
+        }}
+        className="border border-red-600 text-red-600 px-6 py-2 rounded-md hover:bg-red-50 transition-colors duration-200"
+      >
+        今日のタスク終了
+      </button>
     </div>
   );
 }
