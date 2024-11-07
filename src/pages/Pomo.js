@@ -13,6 +13,7 @@ import Camera from "../components/NewCamera";
 import { startNeckStretch } from "../components/StretchNeck";
 //import { set } from "firebase/database";
 //import { startWaistStretch } from "../components/StretchWaist";
+import axios from 'axios';
 
 function Pomo() {
   const { currentUser } = useAuth();
@@ -42,6 +43,8 @@ function Pomo() {
   const [transcript, setTranscript] = useState('');
   const [recognition, setRecognition] = useState(null);
   const [isRecording, setIsRecording] = useState(false);
+  const [showReport, setShowReport] = useState(false);
+  const [report2, setReport2] = useState(''); // 新しいステートを追加
 
   // カテゴリーの取得
   const fetchCategories = useCallback(async () => {
@@ -233,37 +236,6 @@ function Pomo() {
   }, [isActive, minutes, seconds, handlePomodoroComplete]);
 
 
-  const handleFinishTasks = () => {
-    if (window.confirm('本当に本日のタスクを終了しますか？')) {
-      startRecording();
-    }
-  };
-
-  
-  const startRecording = () => {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      alert('このブラウザは音声認識に対応していません。');
-      return;
-    }
-  
-    const recognition = new SpeechRecognition();
-    recognition.lang = 'ja-JP';
-  
-    recognition.start();
-  
-    recognition.onresult = (event) => {
-      const transcript = event.results[0][0].transcript;
-       // 音声入力をそのまま表示
-      setReport(transcript);
-      // getSummary(transcript);
-    };
-  
-    recognition.onerror = (event) => {
-      console.error('音声認識エラー:', event.error);
-      alert('音声認識中にエラーが発生しました。');
-    };
-  };
 
 // ここから追加
 
@@ -305,7 +277,7 @@ function Pomo() {
 
       recognitionInstance.onend = () => {
         setIsRecording(false);
-        // sendToOpenAI(finalTranscript);
+        sendToOpenAI(finalTranscript);
       };
 
       recognitionInstance.start();
@@ -319,34 +291,72 @@ function Pomo() {
     if (recognition) {
       recognition.stop();
       setIsRecording(false);
-      setReport(transcript); // 音声入力結果をレポートに保存
+      // setReport(transcript); // 音声入力結果をレポートに保存
     }
   };
 
   const sendToOpenAI = async (text) => {
     try {
       const apiKey = process.env.REACT_APP_OPENAI_API_KEY;
-
-      const response = await fetch('https://api.openai.com/v1/completions', {
-        method: 'POST',
+      
+      // APIキーの存在チェック
+      if (!apiKey) {
+        throw new Error('OpenAI APIキーが設定されていません。');
+      }
+  
+      // 最新のモデルを使用
+      const response = await axios.post('https://api.openai.com/v1/chat/completions', {
+        model: "gpt-4o-mini", // または "gpt-4" など、使用したいモデルを指定
+        messages: [
+          {
+            role: "system",
+            content: "あなたは入力内容に対して適切に要約することができるアシスタントです。出力は必ず「今日達成、学んだこと、できなかったこと」という項目でまとめて出力するようにしてください"
+          },
+          {
+            role: "user",
+            content: text
+          }
+        ],
+        max_tokens: 100,
+        temperature: 0.7,
+      }, {
         headers: {
-          'Content-Type': 'application/json',
           'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          model: 'text-davinci-003',
-          prompt: `以下の内容を元に、今日の達成事項と難しかったことをシンプルにまとめてください。\n\n${text}`,
-          max_tokens: 150,
-          temperature: 0.7,
-        }),
       });
-
-      const data = await response.json();
-      const aiReply = data.choices[0].text.trim();
-      setReport(aiReply);
+  
+      // レスポンスの構造が異なるため、アクセス方法を修正
+      const gptResponse = response.data.choices[0].message.content.trim();
+      setReport(gptResponse);
+      // setShowReport(true); // レポートを表示
+      return gptResponse;
+  
     } catch (error) {
-      console.error('OpenAI APIエラー:', error);
-      alert('レポートの生成中にエラーが発生しました。');
+      // より詳細なエラーハンドリング
+      if (error.response) {
+        // APIからのエラーレスポンス
+        console.error('OpenAI APIエラー:', error.response.data);
+        switch (error.response.status) {
+          case 401:
+            alert('APIキーが無効です。');
+            break;
+          case 429:
+            alert('リクエスト制限に達しました。しばらく待ってから再試行してください。');
+            break;
+          default:
+            alert(`エラーが発生しました（${error.response.status}）`);
+        }
+      } else if (error.request) {
+        // リクエストは作られたがレスポンスが受け取れなかった
+        console.error('ネットワークエラー:', error.request);
+        alert('ネットワークエラーが発生しました。インターネット接続を確認してください。');
+      } else {
+        // リクエスト作成時のエラー
+        console.error('エラー:', error.message);
+        alert('予期せぬエラーが発生しました。');
+      }
+      throw error;
     }
   };
 
@@ -420,6 +430,28 @@ function Pomo() {
               </div>
             )}
           </div>
+
+
+          {/* 本日のレポート */}
+          {showReport && (
+            <div className="bg-white rounded-lg shadow-lg p-4">
+              <h2 className="text-xl font-bold text-gray-900 mb-4">本日のレポート</h2>
+              <p className="text-gray-700">{report2}</p>
+              <div className="flex justify-end space-x-3">
+                <button
+                  onClick={() => setShowReport(false)}
+                  className="mt-4 bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 transition-colors duration-200"
+                >
+                  閉じる
+                </button>
+              </div>
+            </div>
+          )}
+
+
+
+
+
 
           {/* タスク設定ボタン */}
           {(mode === 'break' || !isActive) && (
@@ -581,6 +613,8 @@ function Pomo() {
               </div>
               )}
 
+
+
               {report && (
               <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
                 <div className="bg-white p-6 rounded-lg shadow-xl max-w-md w-full relative">
@@ -588,10 +622,14 @@ function Pomo() {
                 <p className="text-gray-700">{report}</p>
                 <div className="flex justify-end space-x-3">
                   <button
-                    onClick={() => setReport('')}
+                    onClick={() => {
+                      setReport2(report);
+                      setReport('');
+                      setShowReport(true);
+                    }}
                     className="mt-4 w-full bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 transition-colors duration-200"
                   >
-                    閉じる
+                    登録する
                   </button>
                   <button
                     onClick={() => {
